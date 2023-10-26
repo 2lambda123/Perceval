@@ -27,51 +27,37 @@
 # OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 # SOFTWARE.
 
-from typing import Dict, Callable
 
-from perceval.components import Circuit
+def exponentiation_by_squaring(base, power: int):
+    """Calculate the result of base^power i.e. base**power using exponentiation by squaring (or square-and-multiply)
 
+    Args:
+        :param base: the element to exponentiate
+        :param power: *strictly positive* integer power
+        :param result: the initialisation of the result
+    """
+    if power < 1:
+        raise ValueError("Power value must be strictly positive")
 
-class PredefinedCircuit:
-    def __init__(self,  c: Circuit,
-                 name: str = None,
-                 description: str = None,
-                 heralds: Dict[int, int] = None,
-                 post_select_fn: Callable = None):
-        r"""Define a `PredefinedCircuit` which is a readonly circuit with more information about its usage
+    if isinstance(base, int):
+        temp_base = base
+        result = base
+    else:
+        temp_base = base.__copy__()
+        result = base.__copy__()
 
-        :param c:
-        :param name:
-        :param description:
-        :param heralds:
-        """
-        self._c = c
-        self._name = name
-        self._description = description
-        self._heralds = heralds
-        self._post_select_fn = post_select_fn
+    power -= 1
 
-    @property
-    def circuit(self):
-        return self._c.copy()
+    while True:
+        # If power is odd
+        if power % 2 == 1:
+            result = result * temp_base
 
-    @property
-    def description(self):
-        return self._description
+        # Divide the power by 2
+        power = power // 2
+        if power == 0:
+            break
+        # Multiply base to itself
+        temp_base = temp_base * temp_base
 
-    @property
-    def name(self):
-        return self._name
-
-    @property
-    def heralds(self) -> dict:
-        return self._heralds
-
-    @property
-    def has_post_select(self) -> bool:
-        return self._post_select_fn is not None
-
-    def post_select(self, s) -> bool:
-        if self._post_select_fn is None:
-            return True
-        return self._post_select_fn(s)
+    return result

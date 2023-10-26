@@ -27,24 +27,44 @@
 # OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 # SOFTWARE.
 
-import exqalibur as xq
-import numpy as np
+from typing import List
 
-for m in range(6, 25):
-    for n in range(1, 13):
-        fsa = xq.FSArray(m, n)
 
-        allop = 0
-        count = 0
-        worst = 0
-        best = None
-        for fs in fsa:
-            nop = np.prod([s+1 for s in fs if s])
-            if nop > worst:
-                worst = nop
-            if best is None or nop < best:
-                best = nop
-            allop += nop
-            count += 1
+class LogicalState(list):
+    def __init__(self, state: List[int] or str = None):
+        """Represent a Logical state
 
-        print("m=", m, "n=", n, "Mn=", count, "best=", best, "worst=", worst, "avg=", allop/count, "ref=", n*2**n)
+        :param state: Can be either None, a list or a str, defaults to None
+        :raises ValueError: Must have only 0 and 1 in a state
+        :raises TypeError: Supports only None, list or str as state type
+        """
+        if state is None:
+            super().__init__([])
+            return
+        if isinstance(state, str):
+            state = [int(elem) for elem in state]
+        if isinstance(state, list):
+            if state.count(0) + state.count(1) != len(state):
+                raise ValueError("A logical state should only contain 0s and 1s")
+            super().__init__(state)
+            return
+        raise TypeError(f"LogicalState can be initialise with None, list or str, here {type(state)}")
+
+    def __add__(self, other):
+        temp = self.copy()
+        temp.extend(other)
+        return temp
+
+    def __str__(self):
+        if not self:
+            return ""
+        return ''.join([str(x) for x in self])
+
+
+def generate_all_logical_states(n : int) -> List[LogicalState]:
+    format_str = f"#0{n+2}b"
+    logical_state_list = []
+    for i in range(2**n):
+        states = format(i, format_str)[2:]
+        logical_state_list.append(LogicalState([int(state) for state in states]))
+    return logical_state_list

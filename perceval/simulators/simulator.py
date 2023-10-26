@@ -198,6 +198,20 @@ class Simulator(ISimulator):
         result.normalize()
         return result
 
+    def _post_select_on_statevector(self, sv: StateVector) -> BSDistribution:
+        self._logical_perf = 1
+        if not self._postselect.has_condition:
+            sv.normalize()
+            return sv
+        result = StateVector()
+        for state, ampli in sv:
+            if self._postselect(state):
+                result += ampli*state
+            else:
+                self._logical_perf -= abs(ampli)**2
+        result.normalize()
+        return result
+
     @dispatch(BasicState)
     def probs(self, input_state: BasicState) -> BSDistribution:
         """
@@ -215,7 +229,6 @@ class Simulator(ISimulator):
         if len(input_state) == 1:
             return self.probs(input_state[0])
         return self._post_select_on_distribution(_to_bsd(self.evolve(input_state)))
-
 
     def _probs_svd_generic(self, input_dist, p_threshold, progress_callback: Optional[Callable] = None):
         decomposed_input = []
@@ -245,7 +258,7 @@ class Simulator(ISimulator):
         where {annot_xy*: bs_xy*,..} is a mapping between an annotation and a pure basic state"""
         for sv, prob in input_dist.items():
             if min(sv.n) >= self._min_detected_photons:
-                decomposed_input.append((prob, [(pa, _annot_state_mapping(st)) for st, pa in sv.items()]))
+                decomposed_input.append((prob, [(pa, _annot_state_mapping(st)) for st, pa in sv]))
             else:
                 self._physical_perf -= prob
         input_set = set([state for s in decomposed_input for t in s[1] for state in t[1].values()])
@@ -331,7 +344,6 @@ class Simulator(ISimulator):
                     raise RuntimeError("Cancel requested")
         return res
 
-
     def probs_svd(self, input_dist: SVDistribution, progress_callback: Optional[Callable] = None):
         """
         Compute the probability distribution from a SVDistribution input and as well as performance scores
@@ -375,7 +387,7 @@ class Simulator(ISimulator):
             input_state = StateVector(input_state)
 
         # Decay input to a list of basic states without annotations and evolve each of them
-        decomposed_input = [(pa, st.separate_state(keep_annotations=True)) for st, pa in input_state.items()]
+        decomposed_input = [(pa, st.separate_state(keep_annotations=True)) for st, pa in input_state]
         input_list = [copy(state) for t in decomposed_input for state in t[1]]
         for state in input_list:
             state.clear_annotations()
@@ -397,4 +409,39 @@ class Simulator(ISimulator):
             result_sv += evolved_in_s * probampli
 
         result_sv.normalize()
-        return result_sv
+        return self._post_select_on_statevector(result_sv)
+
+    def evolve_svd(self, svd: Union[SVDistribution, StateVector, BasicState], progress_callback: Optional[Callable] = None) -> SVDistribution:
+        """
+        Compute the SVDistribution evolved through a Linear Optical circuit
+
+        :param svd: The input StateVector distribution
+        :param progress_callback: A function with the signature `func(progress: float, message: str)`
+        :return: A dictionary of the form { "results": SVDistribution, "physical_perf": float, "logical_perf": float }
+        * results is the post-selected output SVDistribution
+        * physical_perf is the performance computed from the detected photon filter
+        * logical_perf is the performance computed from the post-selection
+        """
+        if not isinstance(svd, SVDistribution):
+            return SVDistribution(self.evolve(svd))
+
+        # If it's actually an SVD
+        intermediary_logical_perf = 1
+        new_svd = SVDistribution()
+        for idx, (sv, p) in enumerate(svd.items()):
+            if min(sv.n) >= self._min_detected_photons:
+                new_sv = self.evolve(sv)
+                intermediary_logical_perf -= p*self._logical_perf
+                if new_sv.m != 0:
+                    new_svd[new_sv] += p
+            else:
+                self._physical_perf -= p
+            if progress_callback:
+                exec_request = progress_callback((idx + 1) / len(svd), 'evolve_svd')
+                if exec_request is not None and 'cancel_requested' in exec_request and exec_request['cancel_requested']:
+                    raise RuntimeError("Cancel requested")
+        self._logical_perf = intermediary_logical_perf
+        new_svd.normalize()
+        return {'results': new_svd,
+                'physical_perf': self._physical_perf,
+                'logical_perf': self._logical_perf}

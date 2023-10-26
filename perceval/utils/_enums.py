@@ -27,40 +27,22 @@
 # OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 # SOFTWARE.
 
-import perceval as pcvl
-import perceval.components.unitary_components as comp
-import exqalibur as xq
+from enum import Enum
 
 
-dt = pcvl.Parameter("Δt")
-
-c = pcvl.Circuit(2)
-c //= comp.BS()
-c //= (1, comp.TD(dt))
-c //= comp.BS()
-
-pcvl.pdisplay(c)
+class Encoding(Enum):
+    DUAL_RAIL = 0
+    POLARIZATION = 1
+    QUDIT = 2
+    TIME = 3
+    RAW = 4
 
 
-def photon_length_fn(t):
-    length = 0.2e-9
-    h = 2 / length
-    if t > length:
-        return length, 1, 0
-    return length, 1-(length-t)*h*(length-t)/2/length, 0
+class InterferometerShape(Enum):
+    RECTANGLE = 0
+    TRIANGLE = 1
 
 
-st0 = pcvl.BasicState([1, 0])
-backend = pcvl.BackendFactory().get_backend("Stepper")
-
-sim = backend(c)
-
-
-def f(x):
-    dt.set_value(x)
-    return sim.prob(st0, xq.FockState([2, 0]))+sim.prob(st0, xq.FockState([0, 2]))
-
-
-for i in range(100):
-    x = i * 2e-9/50
-    print("f(%g)=%g" % (x, f(x)))
+class FileFormat(Enum):
+    BINARY = 0
+    TEXT = 1

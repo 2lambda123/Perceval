@@ -27,12 +27,14 @@
 # OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 # SOFTWARE.
 import pytest
+import math
 import numpy as np
 
 from perceval.backends import AProbAmpliBackend, SLOSBackend
 from perceval.simulators import Simulator
-from perceval.components import Circuit, BS
+from perceval.components import Circuit, BS, PS
 from perceval.utils import BasicState, BSDistribution, StateVector, SVDistribution, PostSelect
+from _test_utils import assert_sv_close, assert_svd_close
 
 
 class MockBackend(AProbAmpliBackend):
@@ -209,9 +211,7 @@ def test_simulator_probs_sv():
     assert len(result) == 1
     assert result[BasicState("|1,0>")] == pytest.approx(1)
 
-    input_state = StateVector()
-    input_state[BasicState("|{_:0},{_:1}>")] += 1
-    input_state[BasicState([1, 1])] += 1
+    input_state = BasicState("|{_:0},{_:1}>") + BasicState([1, 1])
     simulator.set_circuit(c)
     result = simulator.probs(input_state)
     assert len(result) == 3
@@ -242,19 +242,22 @@ def test_evolve_indistinguishable():
     simulator.set_circuit(BS.H())
     sv1 = BasicState([1, 1])
     sv1_out = simulator.evolve(sv1)
-    assert str(sv1_out) == "sqrt(2)/2*|2,0>-sqrt(2)/2*|0,2>"
+    assert_sv_close(sv1_out, math.sqrt(2)/2*StateVector([2, 0]) - math.sqrt(2)/2*StateVector([0, 2]))
     sv1_out_out = simulator.evolve(sv1_out)
-    assert str(sv1_out_out) == "|1,1>"
+    assert_sv_close(sv1_out_out, StateVector([1, 1]))
 
 
 def test_evolve_distinguishable():
     simulator = Simulator(SLOSBackend())
     simulator.set_circuit(BS.H())
-    sv2 = BasicState("|{a:0},{a:0}{a:1}>")
+    sv2 = StateVector("|{a:0},{a:0}{a:1}>")
     sv2_out = simulator.evolve(sv2)
-    assert str(sv2_out) == "1/2*|2{a:0}{a:1},0>-1/2*|2{a:0},{a:1}>-1/2*|{a:1},2{a:0}>+1/2*|0,2{a:0}{a:1}>"
+    assert pytest.approx(sv2_out[BasicState('|2{a:0}{a:1},0>')]) == 1/2
+    assert pytest.approx(sv2_out[BasicState('|2{a:0},{a:1}>')]) == -1/2
+    assert pytest.approx(sv2_out[BasicState('|{a:1},2{a:0}>')]) == -1/2
+    assert pytest.approx(sv2_out[BasicState('|0,2{a:0}{a:1}>')]) == 1/2
     sv2_out_out = simulator.evolve(sv2_out)
-    assert str(sv2_out_out) == "|{a:0},{a:0}{a:1}>"
+    assert_sv_close(sv2_out_out, sv2)
 
 
 def test_statevector_polar_evolve():
@@ -262,15 +265,42 @@ def test_statevector_polar_evolve():
     simulator.set_circuit(BS())
     st1 = StateVector("|{P:H},{P:H}>")
     st2 = StateVector("|{P:H},{P:V}>")
-    gamma = np.pi / 2
-    input_state = np.cos(gamma) * st1 + np.sin(gamma) * st2
+    gamma = math.pi / 2
+    input_state = math.cos(gamma) * st1 + math.sin(gamma) * st2
 
-    sum_p = 0
-    for _, p in simulator.probs(input_state).items():
-        sum_p += p
+    sum_p = sum(list(simulator.probs(input_state).values()))
     assert pytest.approx(1) == sum_p
 
-    sum_p = 0
-    for _, p in simulator.probs(st2).items():
-        sum_p += p
+    sum_p = sum(list(simulator.probs(st2).values()))
     assert pytest.approx(1) == sum_p
+
+
+def test_evolve_phase():
+    input_state = StateVector([2, 0]) + StateVector([1, 1])
+    c = Circuit(2).add(1, PS(phi=math.pi/3))
+    simu = Simulator(SLOSBackend())
+    simu.set_circuit(c)
+    output_sv = simu.evolve(input_state)
+    assert output_sv[BasicState([1, 1])] == pytest.approx(complex(math.sqrt(2)/4, math.sqrt(6)/4))
+
+
+def test_simulator_evolve_svd():
+    input_svd = SVDistribution({StateVector([1, 1]): 0.2,
+                                StateVector([2, 0]): 0.8})
+    b = SLOSBackend()
+    b.set_circuit(Circuit(2).add(0, BS.H()))
+    sim = Simulator(b)
+    svd_expected = SVDistribution({(math.sqrt(2)/2)*BasicState([2,0])-(math.sqrt(2)/2)*BasicState([0,2]): 0.2,
+                                   0.5*BasicState([2,0])+0.5*BasicState([0,2])+(math.sqrt(2)/2)*BasicState([1,1]): 0.8})
+
+    assert_svd_close(sim.evolve_svd(input_svd)['results'], svd_expected)
+
+    ps = PostSelect("[0] == 1")
+    sv = BasicState([0, 1]) + BasicState([1, 0])
+    sv.normalize()
+    input_svd_2 = SVDistribution({sv: 0.2,
+                                  StateVector([1,0]): 0.8})
+    sim.set_postselection(ps)
+    output_svd_2 = sim.evolve_svd(input_svd_2)["results"]
+    assert len(output_svd_2) == 1
+    assert output_svd_2[StateVector([1,0])] == pytest.approx(1)

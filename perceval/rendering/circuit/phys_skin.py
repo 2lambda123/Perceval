@@ -28,16 +28,13 @@
 # SOFTWARE.
 
 from multipledispatch import dispatch
-import copy
+import numpy as np
 
 from perceval.components import AComponent, Circuit, Port, Herald, PortLocation,\
     unitary_components as cp,\
     non_unitary_components as nu
 from .abstract_skin import ASkin, ModeStyle
 from .skin_common import bs_convention_color
-
-import sympy as sp
-import numpy as np
 
 
 class PhysSkin(ASkin):

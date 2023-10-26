@@ -27,12 +27,11 @@
 # OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 # SOFTWARE.
 
-import perceval as pcvl
+from perceval import PMetadata, __version__
 
-u = pcvl.Matrix.random_unitary(10)
-sim = pcvl.BackendFactory().get_backend("SLOS")(pcvl.Circuit(10, u), n=3, mask=["3         "])
 
-print(sim.prob(input_state=pcvl.BasicState([1,0,1,0,0,1,0,0,0,0]),
-               output_state=pcvl.BasicState([3,0,0,0,0,0,0,0,0,0])))
-print(sim.prob(input_state=pcvl.BasicState([1,0,1,0,0,0,0,0,0,1]),
-               output_state=pcvl.BasicState([3,0,0,0,0,0,0,0,0,0])))
+def test_metadata():
+    assert PMetadata.package_name() == "perceval-quandela"
+    assert PMetadata.author() == "quandela"
+    assert PMetadata.version() == __version__
+    assert __version__.startswith(PMetadata.short_version())

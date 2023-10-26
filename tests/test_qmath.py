@@ -27,32 +27,46 @@
 # OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 # SOFTWARE.
 
-import perceval as pcvl
-import numpy as np
-import matplotlib.pyplot as plt
-import perceval.components.unitary_components as comp
-from perceval.rendering.pdisplay import pdisplay_statevector
+from perceval import BasicState, StateVector, BSDistribution, SVDistribution
+from perceval.utils.qmath import exponentiation_by_squaring
+from _test_utils import assert_sv_close, assert_svd_close
 
 
-N = 100
-ind = np.arange(0, 1, 1/N)
-o = np.zeros((100,))
-simulator_backend = pcvl.BackendFactory().get_backend('Naive')
+def test_exponentiation():
+    # Numbers
+    assert exponentiation_by_squaring(12, 1), 12
+    assert exponentiation_by_squaring(8, 2), 64
+    assert exponentiation_by_squaring(52, 13), 20325604337285010030592
 
-for i in range(N):
-    source = pcvl.Source(brightness=1, purity=1, indistinguishability=ind[i])
-    qpu = pcvl.Processor({0: source, 1: source}, comp.BS())
-    all_p, sv_out = qpu.run(simulator_backend)
-    o[i] = sv_out[pcvl.StateVector("|1,1>")]
+    # Basic state
+    bs = BasicState("|1,0,1,0,0>")
+    assert bs**3 == bs * bs * bs
 
-plt.plot(ind, o)
-plt.ylabel("$p(|1,1>)$")
-plt.xlabel("indistinguishability")
-source = pcvl.Source(brightness=1, purity=1, indistinguishability=0.5)
-qpu = pcvl.Processor({0: source, 1: source}, comp.BS())
+    # Annoted basic state
+    annot_bs = BasicState("|0,0,{_:0}{_:1},0>")
+    assert annot_bs**5 == annot_bs * annot_bs * annot_bs * annot_bs * annot_bs
 
-all_p, sv_out = qpu.run(simulator_backend)
-print("INPUT\n", pdisplay_statevector(qpu.source_distribution))
-print("OUTPUT\n", pdisplay_statevector(sv_out))
+    # State vector
+    sv = StateVector(BasicState("|1,0,4,0,0,2,0,1>")) - 1j * StateVector(BasicState("|1,0,3,0,2,1,0,1>"))
+    assert_sv_close(sv, sv)
+    assert_sv_close(sv**2, sv * sv)
+    assert_sv_close(sv**7, sv * sv * sv * sv * sv * sv * sv)
 
-plt.show()
+    # Basic state Distribution
+    bsd = BSDistribution()
+    bsd[BasicState([0, 0])] = 0.25
+    bsd[BasicState([1, 0])] = 0.25
+    bsd[BasicState([0, 1])] = 0.25
+    bsd[BasicState([2, 0])] = 0.125
+    bsd[BasicState([0, 2])] = 0.125
+    assert bsd**2 == bsd * bsd
+    assert bsd**7 == bsd * bsd * bsd * bsd * bsd * bsd * bsd
+
+    # State vector Distribution
+    svd = SVDistribution()
+    svd[StateVector([0]) + StateVector([1])] = 0.25
+    svd[StateVector([0]) + 1j*StateVector([1])] = 0.35
+    svd[StateVector([1])] = 0.4
+    assert_svd_close(svd, svd)
+    assert_svd_close(svd**2, svd * svd)
+    assert_svd_close(svd**5, svd * svd * svd * svd * svd)

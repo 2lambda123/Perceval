@@ -27,51 +27,19 @@
 # OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 # SOFTWARE.
 
-import perceval as pcvl
 import exqalibur as xq
-import numpy as np
-import time
 
-m = 16
-n = 12
+def test_mask():
+    mask = xq.FSMask(6, 4, ["    11"])
+    assert mask.match(xq.FockState("|0,0,1,1,1,1>"))
+    # no partial masking (we don't accept lower number of photons)
+    assert not mask.match(xq.FockState("|0,0,1,1,1,0>"), False)
+    # partial masking (we accept lower number of photons)
+    assert mask.match(xq.FockState("|0,0,1,1,1,0>"), True)
 
-u = pcvl.Matrix.random_unitary(m)
 
-fsms = [[]]
-fsas = [xq.FSArray(m, 0)]
-coefs = [[1]]
-
-for i in range(1, m+1):
-    fsas.append(xq.FSArray(m, i))
-    coefs.append(np.zeros(fsas[-1].count(), dtype=complex))
-    fsms.append(xq.FSiMap(fsas[-1], fsas[-2], True))
-
-compute = 0
-def permanent(idx_current, k):
-    global compute
-    if k == 0:
-        return 1
-    if not coefs[k][idx_current]:
-        m = 0
-        while m < k:
-            index_parent, mode = fsms[k].get(idx_current, m)
-            if index_parent == xq.npos:
-                break
-            compute += 1
-            coefs[k][idx_current] += permanent(index_parent, k-1)*u[k-1, mode]
-            m += 1
-    return coefs[k][idx_current]
-
-start_slos_1 = time.time()
-for idx in range(fsas[-1].count()):
-    permanent(idx, n)
-end_slos_1 = time.time()
-time_total_slos = end_slos_1-start_slos_1
-print("slos", time_total_slos)
-
-start_qc_1 = time.time()
-for idx in range(fsas[-1].count()):
-    xq.permanent_cx(u, 1)
-end_qc_1 = time.time()
-
-print("qc", end_qc_1-start_qc_1)
+def test_mask_multiple():
+    mask = xq.FSMask(6, 4, ["   011", "   110"])
+    assert mask.match(xq.FockState("|0,0,1,0,1,1>"))
+    assert mask.match(xq.FockState("|0,0,1,1,1,0>"))
+    assert not mask.match(xq.FockState("|0,0,1,1,1,1>"))
