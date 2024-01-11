@@ -132,8 +132,8 @@ class LocalJob(Job):
         self._cancel_requested = True
 
     def get_results(self) -> Any:
-        if not self.is_complete:
-            raise RuntimeError('The job is still running, results are not available yet.')
+        if not self.status.is_complete:
+            raise RuntimeError('The job is still running and the results are not available yet.')
         job_status = self.status
         if job_status.status != RunningStatus.SUCCESS:
             raise RuntimeError(f'The job failed with exception: {job_status.stop_message}')
@@ -143,5 +143,6 @@ class LocalJob(Job):
                                                                          **self._delta_parameters['mapping'])
             elif 'results_list' in self._results:
                 for res in self._results["results_list"]:
-                    res["results"] = self._result_mapping_function(res['results'], **self._delta_parameters['mapping'])
+                    if self._result_mapping_function:
+                        res["results"] = self._apply_result_mapping(res['results'], **self._delta_parameters['mapping'])
         return self._results
