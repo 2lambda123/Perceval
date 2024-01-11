@@ -102,7 +102,7 @@ class LocalJob(Job):
         except Exception as e:
             import logging
             logging.error(f"An exception was raised during job execution. {type(e)}: {e}")
-            self._status.stop_run(RunningStatus.ERROR, str(type(e))+": "+str(e))
+            self._status.stop_run(RunningStatus.ERROR, f'{type(e)}: {e}')
         try:
             # it has already been called, calling it again to get more precise running time
             self._status.start_run()
@@ -135,7 +135,7 @@ class LocalJob(Job):
             raise RuntimeError('The job is still running, results are not available yet.')
         job_status = self.status
         if job_status.status != RunningStatus.SUCCESS:
-            raise RuntimeError('The job failed with exception: ' + job_status.stop_message)
+            raise RuntimeError(f'The job failed with exception: {job_status.stop_message}')
         if self._result_mapping_function:
             if 'results' in self._results:
                 self._results['results'] = self._result_mapping_function(self._results['results'],
