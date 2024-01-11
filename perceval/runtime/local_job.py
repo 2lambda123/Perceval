@@ -89,6 +89,20 @@ class LocalJob(Job):
         r"""
         Wrapping function called in the job thread in charge of catching exception and correctly setting status
         """
+        # Add a try-except block to catch exceptions
+        try:
+            # it has already been called, calling it again to get more precise running time
+            self._status.start_run()
+            self._results = self._fn(*args, **kwargs)
+            if self._cancel_requested:
+                self._status.stop_run(RunningStatus.CANCELED, "User has canceled the job")
+            else:
+                self._status.stop_run()
+        # Log the exception and update the status of the job
+        except Exception as e:
+            import logging
+            logging.error(f"An exception was raised during job execution. {type(e)}: {e}")
+            self._status.stop_run(RunningStatus.ERROR, str(type(e))+": "+str(e))
         try:
             # it has already been called, calling it again to get more precise running time
             self._status.start_run()
