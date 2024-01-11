@@ -103,6 +103,7 @@ class LocalJob(Job):
             import logging
             logging.error(f"An exception was raised during job execution. {type(e)}: {e}")
             self._status.stop_run(RunningStatus.ERROR, f'{type(e)}: {e}')
+            raise
         try:
             # it has already been called, calling it again to get more precise running time
             self._status.start_run()
