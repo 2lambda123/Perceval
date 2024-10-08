@@ -575,7 +575,7 @@ def create_renderer(
     """
     if output_format == Format.TEXT:
         return TextRenderer(n)
-    
+
     assert skin is not None, "A skin must be selected for circuit graphical rendering"
     if output_format == Format.HTML:
         canvas = SvgCanvas(**opts)
